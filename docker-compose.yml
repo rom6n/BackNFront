@@ -1,0 +1,102 @@
+services:
+  backend:
+    build:
+      context: ./webServer
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: unless-stopped
+    labels:
+      app: backend
+
+  frontend:
+    build:
+      context: ./frontSide
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    labels:
+      app: frontend
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_data:/usr/share/nginx/html/metrics
+    ports:
+      - "7070:80"
+    depends_on:
+      - backend
+      - frontend
+      - grafana
+    restart: unless-stopped
+    labels:
+      app: nginx
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+      - loki
+      - promtail
+    labels:
+      app: prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=123
+      - GF_SERVER_ROOT_URL=http://localhost:7070/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SERVER_HTTP_PORT=3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+    labels:
+      app: grafana
+
+  loki:
+    image: grafana/loki:2.8.2
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - ./loki/data:/loki
+      - ./loki/wal:/wal
+    labels:
+      app: loki
+
+  promtail:
+      image: grafana/promtail:2.8.2
+      container_name: promtail
+      volumes:
+        - ./promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
+        - /var/lib/docker/containers:/var/lib/docker/containers:ro
+        - /var/log:/var/log:ro
+        - /etc/machine-id:/etc/machine-id:ro
+        - /var/run/docker.sock:/var/run/docker.sock:ro
+      command: -config.file=/etc/promtail/config.yml
+      labels:
+        app: promtail
+      depends_on:
+        - loki
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  nginx_data:

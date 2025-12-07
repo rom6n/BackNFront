@@ -1,0 +1,14 @@
+# Node / Frontend
+frontSide/node_modules/
+frontSide/dist/
+
+# Loki
+loki/data/cache
+loki/data/chunks
+loki/data/index
+loki/data/wal/
+loki/wal/
+loki/compactor/
+
+.idea/
+*.iml
